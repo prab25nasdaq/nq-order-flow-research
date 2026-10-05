@@ -1,0 +1,5 @@
+contract=NQU6 bar_idx=4769 depth_n=15
+This bar has 88 cells in the long master.
+The packed row has 88 cells (cells_count_check).
+Sum(cells_bid_add_list) == total_bid_add: True
+STATUS: PASS
