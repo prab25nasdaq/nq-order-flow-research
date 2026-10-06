@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cliff View Capital -- Book-Flow Level Candles</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Book-Flow Level Candles: an order-flow-native alternative to OHLC price bars, built from raw bid/ask depth and quote data. Shadow/research only.">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; font-family: "Segoe UI", sans-serif;
+    background: #050508; color: #ddd; scroll-behavior: smooth;
+  }
+  body {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(70, 120, 200, 0.16), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 15% 100%, rgba(60, 180, 190, 0.10), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(200, 60, 150, 0.10), transparent 60%),
+      #050508;
+    background-attachment: fixed;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------------------------------------------------------------- header --- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px; border-bottom: 1px solid rgba(120, 140, 200, 0.14);
+  }
+  header .brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+  header .brand img { height: 52px; display: block; }
+  /* MISSION header-tagline: flex:1 + text-align:center fills whatever space is actually left
+     between the logo and Sign In (robust regardless of either's width, rather than relying on
+     justify-content: space-between to land it visually centered on its own). Typography mirrors
+     login.html's own existing .subtitle treatment (small, muted, understated) rather than
+     matching the hero h1 in any way -- this is a quiet positioning line, not a second headline. */
+  header .tagline {
+    flex: 1 1 auto; text-align: center; color: #aab0c4; font-size: 20px; font-weight: 500;
+    letter-spacing: 0.01em; padding: 0 16px;
+  }
+  header a.btn-ghost { flex: 0 0 auto; }
+  /* .tagline's flex:1 1 auto (above) consumes all free space, so the header's own
+     justify-content: space-between leaves zero gap between two adjacent fixed-size buttons on
+     the right -- this is the header's only multi-button cluster, so a scoped adjacent-sibling
+     rule here is simpler than introducing a new wrapper element for it. */
+  header a.btn-ghost + a.btn-ghost { margin-left: 10px; }
+  .btn {
+    display: inline-block; padding: 10px 20px; border-radius: 6px;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.02em; text-decoration: none;
+    cursor: pointer; border: none; transition: filter 0.15s ease, background 0.15s ease;
+  }
+  .btn-primary {
+    color: #050508;
+    background: linear-gradient(90deg, #4fd1c5, #8b7ff0, #e0679e);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost {
+    color: #cdd3e6; background: transparent; border: 1px solid rgba(140, 155, 210, 0.4);
+  }
+  .btn-ghost:hover { background: rgba(140, 155, 210, 0.1); }
+
+  /* ------------------------------------------------------------------ hero --- */
+  .hero { text-align: center; padding: 88px 24px 64px; position: relative; overflow: hidden; }
+  h1 { font-size: 42px; line-height: 1.15; margin: 0 0 20px; letter-spacing: -0.01em; position: relative; z-index: 1; }
+  .hero .subhead {
+    max-width: 680px; margin: 0 auto 34px; color: #aab0c4; font-size: 17px; line-height: 1.6;
+    position: relative; z-index: 1;
+  }
+  .hero .ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; }
+
+  /* ---------------------------------------------------------- floating bg --- */
+  /* MISSION landing-page-refinements: decorative ONLY -- recreates the CONCEPT of the source
+     banner's small floating price-readout cards (number + signed % change), not the banner's
+     illustrated mountain/castle scene itself. Deliberately abstract/low-opacity so nothing here
+     could be mistaken for a real, current data readout. Sits behind all hero content (z-index 0
+     vs. content's z-index 1 above), never intercepts clicks (pointer-events: none). Pure CSS
+     @keyframes on transform+opacity only (both GPU-compositable, no layout/paint cost) -- the tiny
+     init script below runs once at load to populate content/stagger, not a per-frame animation
+     loop, so there's no ongoing JS cost either.
+  */
+  .float-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  /* Shared base for both floating element types (numeric cards + mountain icons) -- same
+     position/opacity/animation contract either way, so mixing them in never introduces a second,
+     visually distinct motion/opacity language. */
+  .float-elem { position: absolute; opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .float-elem { animation: floatDrift linear infinite; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .float-elem { opacity: 0.14; }
+  }
+  .float-card {
+    padding: 6px 10px; border-radius: 7px; font-size: 12px;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    background: rgba(12, 13, 20, 0.55); border: 1px solid rgba(120, 140, 200, 0.18);
+    display: flex; gap: 8px;
+  }
+  .float-card .n { color: #aeb4c8; }
+  .float-card .p.up { color: #4fd1c5; }
+  .float-card .p.down { color: #ff6f91; }
+  /* MISSION floating-icons-v2: the actual Cliff View Capital logo.png (same asset used in the
+     header/login page), not a redrawn shape -- sized by height only, width follows its own
+     aspect ratio. Bigger than the original icon pass, still opacity-governed by .float-elem so
+     it never exceeds the same restrained peak opacity as the ticker cards. */
+  .float-icon { height: 62px; filter: drop-shadow(0 0 8px rgba(120, 170, 220, 0.3)); }
+  .float-icon img { display: block; height: 100%; width: auto; }
+  @keyframes floatDrift {
+    0%   { transform: translateY(24px); opacity: 0; }
+    12%  { opacity: 0.2; }
+    50%  { opacity: 0.16; }
+    88%  { opacity: 0; }
+    100% { transform: translateY(-160px); opacity: 0; }
+  }
+
+  /* ---------------------------------------------------------------- section --- */
+  section { padding: 64px 24px; border-top: 1px solid rgba(120, 140, 200, 0.10); }
+  .section-title { font-size: 26px; margin: 0 0 14px; text-align: center; }
+  .section-lede {
+    max-width: 720px; margin: 0 auto 40px; color: #aab0c4; font-size: 15.5px; line-height: 1.7;
+    text-align: center;
+  }
+
+  /* ------------------------------------------------------------------ proof --- */
+  .proof-frame {
+    background: rgba(12, 13, 20, 0.72); border: 1px solid rgba(120, 140, 200, 0.22);
+    border-radius: 10px; padding: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    max-width: 920px; margin: 0 auto;
+  }
+  .proof-frame img { display: block; width: 100%; height: auto; border-radius: 6px; }
+  .proof-caption { text-align: center; color: #7d859c; font-size: 13px; margin-top: 16px; }
+
+  /* --------------------------------------------------------- strategy lab --- */
+  /* Reuses .card/.grid exactly as-is (same tokens, same component) -- these two rules only
+     override layout (one column instead of #differentiator's two, matching the copy's own "three
+     feature ROWS" framing) and add the spacing a single section-local sequence needs, scoped by
+     the section's own id so #differentiator's existing 2-column grid is untouched. */
+  #strategy-lab .grid { grid-template-columns: 1fr; max-width: 720px; margin: 0 auto 32px; }
+  #strategy-lab .cta-row { text-align: center; margin-top: 26px; }
+
+  /* ------------------------------------------------------------------ grid --- */
+  .grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 880px; margin: 0 auto;
+  }
+  .card {
+    background: rgba(12, 13, 20, 0.72); border: 1px solid rgba(120, 140, 200, 0.22);
+    border-radius: 10px; padding: 22px 22px 20px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 15.5px; color: #e6e9f5; }
+  .card p { margin: 0; color: #9aa4bb; font-size: 13.5px; line-height: 1.6; }
+
+  /* ------------------------------------------------------------------ rigor --- */
+  .rigor-card {
+    max-width: 720px; margin: 0 auto; background: rgba(12, 13, 20, 0.72);
+    border: 1px solid rgba(120, 140, 200, 0.22); border-radius: 10px; padding: 28px 30px;
+  }
+  .rigor-card h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; color: #ff8fa3; }
+  .rigor-card p { margin: 0 0 12px; color: #b7bdd0; font-size: 14.5px; line-height: 1.7; }
+  .rigor-card p:last-child { margin-bottom: 0; }
+
+  /* ------------------------------------------------------------------- form --- */
+  .form-card {
+    max-width: 480px; margin: 0 auto; background: rgba(12, 13, 20, 0.72);
+    border: 1px solid rgba(120, 140, 200, 0.22); border-radius: 10px; padding: 32px 30px 28px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  }
+  label { display: block; font-size: 12.5px; color: #9aa4bb; margin: 0 0 6px; }
+  input[type="text"], input[type="email"], textarea {
+    width: 100%; padding: 10px 12px; margin-bottom: 16px;
+    background: #14151d; border: 1px solid #2c2f3d; border-radius: 5px;
+    color: #eee; font-size: 14px; outline: none; font-family: inherit; resize: vertical;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  textarea { min-height: 76px; }
+  input:focus, textarea:focus {
+    border-color: #6aa8d8; box-shadow: 0 0 0 3px rgba(90, 150, 210, 0.18);
+  }
+  .form-card button { width: 100%; margin-top: 6px; padding: 11px; }
+  .status-box {
+    display: none; border-radius: 5px; padding: 9px 12px; margin-bottom: 16px; font-size: 13px;
+  }
+  .status-box.visible { display: block; }
+  .status-box.ok {
+    background: rgba(79, 209, 197, 0.12); border: 1px solid rgba(79, 209, 197, 0.4); color: #7fe9dd;
+  }
+  .status-box.err {
+    background: rgba(255, 77, 109, 0.12); border: 1px solid rgba(255, 77, 109, 0.4); color: #ff8fa3;
+  }
+
+  /* ----------------------------------------------------------------- footer --- */
+  footer {
+    text-align: center; padding: 40px 24px 48px; font-size: 12px; color: #566; letter-spacing: 0.03em;
+  }
+  .diamond {
+    display: inline-block; width: 6px; height: 6px; margin: 0 8px;
+    background: linear-gradient(135deg, #4fd1c5, #e0679e); transform: rotate(45deg); vertical-align: middle;
+  }
+  footer .btn-ghost { margin-top: 16px; font-size: 12.5px; padding: 7px 16px; }
+
+  @media (max-width: 700px) {
+    h1 { font-size: 30px; }
+    .hero { padding: 56px 20px 44px; }
+    .section-title { font-size: 21px; }
+    .grid { grid-template-columns: 1fr; }
+    section { padding: 44px 20px; }
+    header { padding: 14px 18px; }
+    header .brand img { height: 38px; }
+    /* No room for a third element once the (already-shrunk) logo and Sign In button share a
+       narrow header -- hidden here rather than shrunk further into illegibility. */
+    header .tagline { display: none; }
+    /* Below this width there's no real side margin left for the floating cards to live in
+       without drifting through the (near-full-width) text column -- hidden here rather than
+       repositioned, since "never compete with readability" is only guaranteed by not showing it. */
+    .float-bg { display: none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="/login-assets/logo.png" alt="Cliff View Capital">
+    </div>
+    <div class="tagline">Where liquidity becomes visible.</div>
+    <a class="btn btn-ghost" href="/login?next=/strategy-lab">Strategy Lab</a>
+    <a class="btn btn-ghost" href="/login">Sign In</a>
+  </header>
+
+  <div class="hero">
+    <div class="float-bg" id="floatBg"></div>
+    <h1>See the order flow,<br>not just the trades.</h1>
+    <p class="subhead">
+      Book-Flow Level Candles are built from raw bid/ask depth and quote data -- every add and pull,
+      at every price level -- revealing liquidity that shaped price without ever printing a trade.
+      Traditional footprint and volume-profile charts can't show this. This can.
+    </p>
+    <div class="ctas">
+      <a class="btn btn-primary" href="#request-access">Request Access</a>
+      <a class="btn btn-ghost" href="/login">Sign In</a>
+    </div>
+  </div>
+
+  <section id="proof">
+    <div class="wrap">
+      <h2 class="section-title">See it in motion</h2>
+      <p class="section-lede">
+        This is the actual product, not a mockup -- the real Book-Flow Level Candle chart, rendering
+        real order-flow data.
+      </p>
+      <div class="proof-frame">
+        <img src="/landing-assets/chart-screenshot-1.png" alt="Book-Flow Level Candle chart showing order-flow cells across price levels">
+      </div>
+      <p class="proof-caption">Live view of the Book-Flow Level Candle chart -- bid/ask flow rendered at every price level, every bar.</p>
+    </div>
+  </section>
+
+  <section id="strategy-lab">
+    <div class="wrap">
+      <h2 class="section-title">Describe a strategy. See how it would have done.</h2>
+      <p class="section-lede">
+        Ask in plain English. The Strategy Lab turns your idea into a real backtest
+        against live-recorded NQ order-flow data, runs it, and shows you the trades,
+        the equity curve, and the numbers behind it. Nothing is estimated. Nothing is
+        guessed.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h3>Plain language in, real simulation out</h3>
+          <p>Say "go long when order-flow imbalance clears 0.4, exit after fifteen bars" and it runs exactly that. No formula syntax, no scripting, no exporting to a separate tool.</p>
+        </div>
+        <div class="card">
+          <h3>Built on the same data as the chart</h3>
+          <p>Every test runs against the recorded bid/ask depth and quote data behind Book-Flow Level Candles -- multi-level imbalance, sweep pressure, VPIN, trade delta, regime breaks. The features you can see, you can test.</p>
+        </div>
+        <div class="card">
+          <h3>Honest about what a backtest can tell you</h3>
+          <p>Results are reported with out-of-sample performance alongside in-sample, and with the number of variations tested. A strategy that only works on the data it was found in will say so. That is the number that matters.</p>
+        </div>
+      </div>
+      <p class="proof-caption">Historical simulation only. Not investment advice, and not a forecast.</p>
+      <div class="cta-row">
+        <a class="btn btn-ghost" href="/login?next=/strategy-lab">Open Strategy Lab</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="differentiator">
+    <div class="wrap">
+      <h2 class="section-title">Why order flow, not just trade flow</h2>
+      <p class="section-lede">
+        A footprint chart -- however detailed -- can only show where trades <em>executed</em>. It has no
+        visibility into resting orders that were placed and then pulled before ever trading. Some of the
+        most information-dense behavior in a market happens exactly there: size building at a level as
+        price approaches it, then vanishing right before contact -- liquidity that shaped the outcome
+        without ever printing a single trade. Because Book-Flow Level Candles are built from raw depth
+        and quote updates rather than trade prints alone, that entire category of behavior becomes
+        visible, at the resolution of every price level, in every bar.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h3>Volume bars, not time bars</h3>
+          <p>Each bar closes after a fixed amount of executed volume, not a fixed clock interval -- a more honest, apples-to-apples unit of "how much happened," instead of two wildly different market states wearing the same 1-minute label.</p>
+        </div>
+        <div class="card">
+          <h3>Resting liquidity, not just trades</h3>
+          <p>Every bid and ask addition and withdrawal at every price level is recorded -- not just where trades printed -- so liquidity that shaped price without ever executing is no longer invisible.</p>
+        </div>
+        <div class="card">
+          <h3>Bid and ask, kept separate</h3>
+          <p>Two bars that look identical on a traditional chart -- same open, same close, same green candle -- can look completely different here, because buying pressure and the other side simply stepping aside are no longer collapsed into one number.</p>
+        </div>
+        <div class="card">
+          <h3>Live book, same axis</h3>
+          <p>The current resting order book renders on the identical price axis as the historical flow record, so where liquidity concentrated historically and where it's sitting right now are one glance apart, not two separate tools.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rigor">
+    <div class="wrap">
+      <div class="rigor-card">
+        <h3>Shadow / Research Only</h3>
+        <p>
+          This system runs in shadow/research mode. It observes and records real, live market data --
+          it does not place trades, and nothing here is a signal, a recommendation, or a claim about
+          future returns.
+        </p>
+        <p>
+          The underlying methodology is built and validated against real production market data, not
+          assembled ad hoc -- the specifics of any model or signal built on top of this data are not
+          disclosed here.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="request-access">
+    <div class="wrap">
+      <h2 class="section-title">Request Access</h2>
+      <p class="section-lede">Tell us a bit about yourself. Access is invite-only and granted directly, not through this form.</p>
+      <div class="form-card">
+        <div class="status-box" id="statusBox"></div>
+        <form id="requestForm" method="post" action="/request-access">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required autocomplete="name">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email">
+          <label for="firm">Firm</label>
+          <input type="text" id="firm" name="firm" autocomplete="organization">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" placeholder="What are you looking to do with this?"></textarea>
+          <button type="submit" class="btn btn-primary" id="submitBtn">Request Access</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Cliff View Capital<span class="diamond"></span>Invite only
+    <div><a class="btn btn-ghost" href="/login">Sign In</a></div>
+  </footer>
+
+  <script>
+    // Decorative floating background (hero only): a mix of price-readout cards and simplified
+    // mountain-mark icons, generated ONCE at load with plausible-looking-but-fake content and
+    // staggered timing. Purely additive ambient texture: if this fails for any reason, the hero
+    // still renders and functions fully (no dependency the rest of the page relies on).
+    (function () {
+      const container = document.getElementById("floatBg");
+      if (!container) return;
+
+      function makeCard() {
+        const el = document.createElement("div");
+        el.className = "float-elem float-card";
+        const num = (Math.random() * 30000 + 5000).toFixed(2);
+        const pct = (Math.random() * 8 + 0.1).toFixed(2);
+        const up = Math.random() > 0.5;
+        const nSpan = document.createElement("span");
+        nSpan.className = "n";
+        nSpan.textContent = num;
+        const pSpan = document.createElement("span");
+        pSpan.className = "p " + (up ? "up" : "down");
+        pSpan.textContent = (up ? "+" : "-") + pct + "%";
+        el.appendChild(nSpan);
+        el.appendChild(pSpan);
+        return el;
+      }
+
+      function makeIcon() {
+        const el = document.createElement("div");
+        el.className = "float-elem float-icon";
+        const img = document.createElement("img");
+        img.src = "/login-assets/logo.png";
+        img.alt = "";
+        el.appendChild(img);
+        return el;
+      }
+
+      // 6 numeric cards + 2 floating logo instances -- same TOTAL element count as the
+      // numeric-only version (8), so mixing these in doesn't make the background any busier.
+      const kinds = [makeCard, makeCard, makeCard, makeCard, makeCard, makeCard, makeIcon, makeIcon];
+      // Left/right margin zones only (mirroring the source banner's own corner-clustered layout)
+      // -- keeps every element clear of the centered headline/subhead/CTA column so it never has
+      // to compete with the actual readable content, even though z-index alone would already
+      // keep it legible. Split into the two zone arrays FIRST, then lane-assign top within each
+      // zone (rather than one fully independent Math.random() per element) -- confirmed live that
+      // pure independent randomness let same-zone cards land on top of each other and stay
+      // visually overlapped/unreadable for several seconds at a time, not just a rare instant.
+      const left = kinds.filter((_, i) => i % 2 === 0);
+      const right = kinds.filter((_, i) => i % 2 === 1);
+      [left, right].forEach((zone, zoneIdx) => {
+        const laneH = 82 / zone.length;
+        zone.forEach((make, lane) => {
+          const el = make();
+          const leftPct = zoneIdx === 0 ? Math.random() * 14 : 78 + Math.random() * 14;
+          el.style.left = leftPct.toFixed(1) + "%";
+          el.style.top = (lane * laneH + Math.random() * laneH * 0.7).toFixed(1) + "%";
+          const duration = 14 + Math.random() * 8;
+          el.style.animationDuration = duration.toFixed(1) + "s";
+          el.style.animationDelay = (-Math.random() * duration).toFixed(1) + "s";
+          container.appendChild(el);
+        });
+      });
+    })();
+
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const box = document.getElementById("statusBox");
+      if (params.get("requested") === "1") {
+        box.textContent = "Thanks -- we've received your request and will be in touch.";
+        box.classList.add("visible", "ok");
+        document.getElementById("requestForm").style.display = "none";
+        location.hash = "#request-access";
+      } else if (params.get("requested") === "0") {
+        box.textContent = "Please check your details and try again.";
+        box.classList.add("visible", "err");
+        location.hash = "#request-access";
+      } else if (params.get("requested") === "rate_limited") {
+        box.textContent = "Too many requests -- please wait a minute and try again.";
+        box.classList.add("visible", "err");
+        location.hash = "#request-access";
+      }
+      document.getElementById("requestForm").addEventListener("submit", () => {
+        document.getElementById("submitBtn").disabled = true;
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cliff View Capital -- Sign in</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; font-family: "Segoe UI", sans-serif;
+    background: #050505; color: #ddd;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(70, 120, 200, 0.16), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 15% 100%, rgba(60, 180, 190, 0.10), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(200, 60, 150, 0.10), transparent 60%),
+      #050508;
+  }
+  .card {
+    width: 360px; max-width: 92vw;
+    background: rgba(12, 13, 20, 0.72);
+    border: 1px solid rgba(120, 140, 200, 0.22);
+    border-radius: 10px;
+    padding: 32px 30px 28px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+  }
+  .logo { display: block; width: 100%; max-width: 260px; margin: 0 auto 22px; }
+  .subtitle {
+    text-align: center; color: #8892a8; font-size: 12.5px; letter-spacing: 0.04em;
+    text-transform: uppercase; margin: -14px 0 24px;
+  }
+  label { display: block; font-size: 12.5px; color: #9aa4bb; margin: 0 0 6px; }
+  input[type="text"], input[type="password"] {
+    width: 100%; padding: 10px 12px; margin-bottom: 16px;
+    background: #14151d; border: 1px solid #2c2f3d; border-radius: 5px;
+    color: #eee; font-size: 14px; outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  input[type="text"]:focus, input[type="password"]:focus {
+    border-color: #6aa8d8;
+    box-shadow: 0 0 0 3px rgba(90, 150, 210, 0.18);
+  }
+  button {
+    width: 100%; padding: 11px; margin-top: 6px;
+    border: none; border-radius: 5px; cursor: pointer;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+    color: #050508;
+    background: linear-gradient(90deg, #4fd1c5, #8b7ff0, #e0679e);
+    transition: filter 0.15s ease;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { filter: grayscale(0.6) brightness(0.8); cursor: default; }
+  .error {
+    display: none;
+    background: rgba(255, 77, 109, 0.12); border: 1px solid rgba(255, 77, 109, 0.4);
+    color: #ff8fa3; border-radius: 5px; padding: 9px 12px; margin-bottom: 16px;
+    font-size: 13px;
+  }
+  .error.visible { display: block; }
+  .footer {
+    text-align: center; margin-top: 22px; font-size: 11px; color: #566;
+    letter-spacing: 0.03em;
+  }
+  .diamond {
+    display: inline-block; width: 6px; height: 6px; margin: 0 8px;
+    background: linear-gradient(135deg, #4fd1c5, #e0679e);
+    transform: rotate(45deg); vertical-align: middle;
+  }
+  /* MISSION google-signin-trial: hidden by default -- shown only via JS once a real client_id was
+     actually injected server-side (see app.js's own __WEBBETA_BUILD_SHA__ pattern for the same
+     "empty placeholder means feature is off" convention this mirrors). An unconfigured or
+     currently-disabled trial renders nothing here at all, not a broken/greyed-out button. */
+  #googleSignInSection { display: none; margin-bottom: 18px; }
+  #googleSignInSection .divider {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 14px;
+    color: #566; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  #googleSignInSection .divider::before, #googleSignInSection .divider::after {
+    content: ""; flex: 1; height: 1px; background: #2c2f3d;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="/login-assets/logo.png" alt="Cliff View Capital">
+    <div class="subtitle">Shadow &amp; Research Access</div>
+    <div class="error" id="errorBox"></div>
+    <div id="googleSignInSection">
+      <div id="gsiButton"></div>
+      <div class="divider">or</div>
+    </div>
+    <form id="loginForm" method="post" action="/login">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <input type="hidden" id="next" name="next" value="">
+      <button type="submit" id="submitBtn">Sign in</button>
+    </form>
+    <div class="footer">Cliff View Capital<span class="diamond"></span>Invite only</div>
+  </div>
+  <!-- MISSION google-signin-trial: real hidden form + form.submit() from the GSI callback below --
+       NOT fetch() -- a real navigation is what makes the redirect, cookie-set, and address-bar
+       update all behave exactly like the existing username/password form already does, with zero
+       separate handling needed. -->
+  <form id="googleCredentialForm" method="post" action="/login/google" style="display:none;">
+    <input type="hidden" name="credential" id="googleCredentialInput">
+    <input type="hidden" name="next" id="googleNextInput">
+  </form>
+  <script>
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const nextUrl = params.get("next") || "";
+      if (nextUrl) document.getElementById("next").value = nextUrl;
+      if (params.get("error") === "1") {
+        const box = document.getElementById("errorBox");
+        box.textContent = "Invalid username or password.";
+        box.classList.add("visible");
+      } else if (params.get("error") === "rate_limited") {
+        const box = document.getElementById("errorBox");
+        box.textContent = "Too many attempts -- please wait a minute and try again.";
+        box.classList.add("visible");
+      } else if (params.get("error") === "google_failed") {
+        const box = document.getElementById("errorBox");
+        box.textContent = "Google sign-in didn't go through -- please try again.";
+        box.classList.add("visible");
+      }
+      document.getElementById("loginForm").addEventListener("submit", () => {
+        document.getElementById("submitBtn").disabled = true;
+      });
+
+      const GOOGLE_CLIENT_ID = "__GOOGLE_SIGNIN_CLIENT_ID__";
+      if (!GOOGLE_CLIENT_ID) return;  // trial off or never configured -- nothing more to do
+
+      document.getElementById("googleSignInSection").style.display = "block";
+
+      window.handleGoogleCredential = function (response) {
+        document.getElementById("googleCredentialInput").value = response.credential;
+        document.getElementById("googleNextInput").value = nextUrl;
+        document.getElementById("googleCredentialForm").submit();
+      };
+
+      const gsiScript = document.createElement("script");
+      gsiScript.src = "https://accounts.google.com/gsi/client";
+      gsiScript.async = true;
+      gsiScript.defer = true;
+      gsiScript.onload = function () {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: window.handleGoogleCredential,
+        });
+        google.accounts.id.renderButton(document.getElementById("gsiButton"), {
+          theme: "outline", size: "large", width: 300, text: "signin_with",
+        });
+      };
+      document.head.appendChild(gsiScript);
+    })();
+  </script>
+</body>
+</html>

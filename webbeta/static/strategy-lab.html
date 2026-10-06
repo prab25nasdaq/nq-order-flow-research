@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cliff View Capital -- AI Strategy Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; padding: 0; font-family: "Segoe UI", sans-serif;
+    background: #050508; color: #ddd;
+    display: flex; flex-direction: column;
+  }
+  body {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(70, 120, 200, 0.16), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 15% 100%, rgba(60, 180, 190, 0.10), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 100% 100%, rgba(200, 60, 150, 0.10), transparent 60%),
+      #050508;
+    background-attachment: fixed;
+  }
+  a { color: inherit; }
+
+  /* ---------------------------------------------------------------- header --- */
+  header {
+    display: flex; align-items: center; gap: 14px; flex: 0 0 auto;
+    padding: 14px 22px; border-bottom: 1px solid rgba(120, 140, 200, 0.14);
+  }
+  header img.logo { height: 34px; display: block; }
+  header .kicker {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    background: linear-gradient(90deg, #4fd1c5, #8b7ff0, #e0679e);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    padding-left: 14px; border-left: 1px solid rgba(120, 140, 200, 0.25);
+  }
+  header nav { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .btn {
+    display: inline-block; padding: 8px 16px; border-radius: 6px;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.02em; text-decoration: none;
+    cursor: pointer; border: none; transition: filter 0.15s ease, background 0.15s ease;
+  }
+  .btn-ghost {
+    color: #cdd3e6; background: transparent; border: 1px solid rgba(140, 155, 210, 0.4);
+  }
+  .btn-ghost:hover { background: rgba(140, 155, 210, 0.1); }
+
+  .subtitle {
+    text-align: center; color: #8892a8; font-size: 12px; letter-spacing: 0.06em;
+    text-transform: uppercase; margin: 16px 0 0;
+  }
+
+  /* ------------------------------------------------------------- mode tabs --- */
+  .mode-tabs { display: flex; gap: 4px; margin-left: 18px; }
+  .mode-tab {
+    font: inherit; font-size: 12.5px; font-weight: 600; color: #9aa4bb;
+    background: transparent; border: 1px solid transparent; border-radius: 6px;
+    padding: 7px 13px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+  }
+  .mode-tab:hover { color: #cdd3e6; background: rgba(140, 155, 210, 0.08); }
+  .mode-tab.active {
+    color: #eef0f4; background: rgba(140, 155, 210, 0.16);
+    border-color: rgba(140, 155, 210, 0.35);
+  }
+
+  /* ------------------------------------------------------------ state panel --- */
+  .state-panel {
+    max-width: 760px; margin: 12px auto 0; padding: 12px 16px; border-radius: 8px;
+    background: rgba(12, 13, 20, 0.75); border: 1px solid rgba(120, 140, 200, 0.2);
+    font-size: 12.5px; color: #cdd3e6; max-height: 40vh; overflow-y: auto;
+  }
+  .state-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .state-panel-head strong { color: #eef0f4; font-size: 13px; }
+  .state-panel-head button {
+    font: inherit; font-size: 11.5px; color: #9aa4bb; background: rgba(140,155,210,0.1);
+    border: 1px solid rgba(140,155,210,0.3); border-radius: 5px; padding: 4px 10px; cursor: pointer;
+  }
+  .state-panel-head button:last-child { margin-left: auto; }
+  .state-panel-body h4 { margin: 10px 0 4px; color: #8b7ff0; font-size: 12px; }
+  .state-panel-body pre {
+    white-space: pre-wrap; word-break: break-word; margin: 4px 0; font-size: 11.5px;
+    color: #aab0c4; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 5px;
+  }
+  .state-panel-body .rec { border-left: 2px solid rgba(120,140,200,0.3); padding-left: 8px; margin: 6px 0; }
+  .state-panel-body .rec.rejected { border-left-color: #e0679e; opacity: 0.75; }
+
+  /* --------------------------------------------------------- tool/subagent log --- */
+  .tool-log { font-size: 11.5px; color: #7f8aa3; margin: 4px 0; padding-left: 4px;
+              border-left: 2px solid rgba(120, 140, 200, 0.2); }
+  .tool-log.subagent { color: #4fd1c5; }
+  .tool-log .err { color: #e0679e; }
+
+  /* ---------------------------------------------------------------- stream --- */
+  main.stream { flex: 1 1 auto; overflow-y: auto; padding: 18px 20px; min-height: 0; }
+  .inner { max-width: 760px; margin: 0 auto; }
+
+  .empty { padding: 50px 0 30px; text-align: center; }
+  .empty h1 {
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-size: 25px; font-weight: 400; letter-spacing: -0.01em; color: #eef0f4; margin: 0 0 10px;
+  }
+  .empty p { color: #aab0c4; font-size: 13.5px; max-width: 460px; margin: 0 auto 6px; line-height: 1.6; }
+  .empty .examples { margin-top: 18px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .empty .examples button {
+    font: inherit; font-size: 12.5px; color: #9aa4bb; background: rgba(12,13,20,0.6);
+    border: 1px solid rgba(120,140,200,0.22); border-radius: 20px; padding: 7px 14px; cursor: pointer;
+  }
+  .empty .examples button:hover { border-color: rgba(140,155,210,0.5); color: #cdd3e6; }
+
+  .msg { margin-bottom: 22px; padding-left: 13px; border-left: 2px solid transparent; }
+  .msg.user { border-left-color: #4fd1c5; }
+  .msg.bot { border-left-color: #8b7ff0; }
+  .msg.err { border-left-color: #e0679e; }
+  .who {
+    font-size: 10.5px; letter-spacing: 0.12em; color: #5c6470; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .thinking { font-size: 12px; color: #5c6470; font-style: italic; margin-bottom: 6px; }
+  .body { white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.6; }
+  .body p { margin: 0 0 10px; }
+  .body p:last-child { margin-bottom: 0; }
+  .body ul { margin: 0 0 10px; padding-left: 20px; }
+  .body li { margin-bottom: 4px; }
+  .body h3 { font-size: 14.5px; font-weight: 600; margin: 14px 0 7px; color: #f2f4f7; }
+  .body code {
+    background: rgba(120,140,200,0.12); border-radius: 4px; padding: 1px 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: #6ee7d5;
+  }
+  .block { position: relative; margin: 0 0 12px; }
+  .block pre {
+    background: rgba(12,13,20,0.72); border: 1px solid rgba(120,140,200,0.22); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.6;
+    color: #d5dae2; white-space: pre;
+  }
+  .block pre code { background: none; padding: 0; color: inherit; }
+  .copy {
+    position: absolute; top: 7px; right: 7px; background: #161a21; border: 1px solid #2c2f3d;
+    border-radius: 5px; padding: 3px 9px; font-size: 10.5px; color: #5c6470; cursor: pointer;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .block:hover .copy, .copy:focus { opacity: 1; }
+
+  .stats { margin-top: 8px; font-size: 10.5px; color: #5c6470; font-family: ui-monospace, monospace; }
+
+  /* ------------------------------------------------------------- result card --- */
+  .result-card {
+    margin: 10px 0 14px; padding: 16px 18px; border-radius: 10px;
+    background: rgba(12,13,20,0.72); border: 1px solid rgba(120,140,200,0.22);
+  }
+  .result-card .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px 18px;
+    margin-bottom: 12px;
+  }
+  .result-card .stat .v { font-size: 18px; font-weight: 600; color: #f2f4f7; font-variant-numeric: tabular-nums; }
+  .result-card .stat .v.pos { color: #6ee7d5; }
+  .result-card .stat .v.neg { color: #e0679e; }
+  .result-card .stat .k { font-size: 10.5px; color: #8892a8; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+  .result-card svg { width: 100%; height: 60px; display: block; margin-bottom: 10px; }
+  .result-card .disclosure { font-size: 11px; color: #5c6470; line-height: 1.5; border-top: 1px solid rgba(120,140,200,0.14); padding-top: 10px; }
+  .result-card .empty-note { font-size: 13px; color: #aab0c4; }
+
+  /* ------------------------------------------------------------ sweep card --- */
+  .sweep-summary { font-size: 13px; color: #cdd3e6; margin-bottom: 12px; }
+  .sweep-summary b { color: #f2f4f7; font-variant-numeric: tabular-nums; }
+  .sweep-summary .null-note { color: #8892a8; font-size: 11.5px; margin-top: 3px; }
+  .sweep-table-wrap { overflow-x: auto; margin-bottom: 12px; }
+  table.sweep-table { border-collapse: collapse; width: 100%; font-size: 12px; white-space: nowrap; }
+  table.sweep-table th, table.sweep-table td { padding: 6px 8px; text-align: right; }
+  table.sweep-table td.params { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+  table.sweep-table th:first-child, table.sweep-table td:first-child,
+  table.sweep-table th:nth-child(2), table.sweep-table td:nth-child(2) { text-align: left; }
+  table.sweep-table thead tr:first-child th {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #8892a8;
+    border-bottom: 1px solid rgba(120,140,200,0.14);
+  }
+  table.sweep-table thead tr:first-child th.grp-in { color: #6ee7d5; }
+  table.sweep-table thead tr:first-child th.grp-out { color: #e0679e; }
+  table.sweep-table thead tr:last-child th {
+    font-size: 10.5px; color: #5c6470; font-weight: 400; padding-top: 2px; padding-bottom: 6px;
+    border-bottom: 1px solid rgba(120,140,200,0.14);
+  }
+  table.sweep-table td { color: #cdd3e6; font-variant-numeric: tabular-nums; }
+  table.sweep-table td.params { color: #f2f4f7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
+  table.sweep-table td.pos { color: #6ee7d5; }
+  table.sweep-table td.neg { color: #e0679e; }
+  table.sweep-table tbody tr:nth-child(1) td { font-weight: 600; }
+
+  /* --------------------------------------------------------- generated-signal card --- */
+  .gen-windows { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+  @media (max-width: 560px) { .gen-windows { grid-template-columns: 1fr; } }
+  .gen-window h4 {
+    margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    font-weight: 600; padding-bottom: 5px; border-bottom: 1px solid rgba(120,140,200,0.14);
+  }
+  .gen-window.in h4 { color: #6ee7d5; }
+  .gen-window.out h4 { color: #e0679e; }
+  .gen-window .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .gen-window .stat .v { font-size: 15px; font-weight: 600; color: #f2f4f7; font-variant-numeric: tabular-nums; }
+  .gen-window .stat .v.pos { color: #6ee7d5; }
+  .gen-window .stat .v.neg { color: #e0679e; }
+  .gen-window .stat .k { font-size: 10px; color: #8892a8; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+  details.gen-code { margin-bottom: 12px; }
+  details.gen-code summary {
+    cursor: pointer; font-size: 12px; color: #9aa4bb; padding: 6px 0; user-select: none;
+  }
+  details.gen-code summary:hover { color: #cdd3e6; }
+  details.gen-code pre {
+    background: rgba(12,13,20,0.72); border: 1px solid rgba(120,140,200,0.22); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; margin: 6px 0 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6;
+    color: #d5dae2; white-space: pre;
+  }
+
+  /* MISSION strategy-lab-web-search Phase 4: "a claim from the web without a visible source is
+     worse than no claim" -- every web_search result renders as its own card, title+link always
+     visible (not tucked behind a details/summary the way generated code is), so a source is
+     never more than one glance away from the claim it backs. */
+  .search-card .search-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #8892a8;
+    margin-bottom: 10px;
+  }
+  .search-card .sources-list { list-style: none; margin: 0; padding: 0; }
+  .search-card .sources-list li {
+    padding: 8px 0; border-top: 1px solid rgba(120,140,200,0.14);
+  }
+  .search-card .sources-list li:first-child { border-top: none; padding-top: 0; }
+  .search-card .sources-list a {
+    color: #8b7ff0; font-size: 13px; font-weight: 600; text-decoration: none; word-break: break-word;
+  }
+  .search-card .sources-list a:hover { text-decoration: underline; }
+  .search-card .sources-list .source-url {
+    display: block; font-size: 10.5px; color: #5c6470; margin-top: 1px; word-break: break-all;
+  }
+  .search-card .sources-list .source-snippet {
+    font-size: 12px; color: #9aa4bb; line-height: 1.5; margin-top: 4px;
+  }
+
+  /* ---------------------------------------------------------------- composer --- */
+  footer.composer { flex: 0 0 auto; border-top: 1px solid rgba(120,140,200,0.14); padding: 14px 20px 16px; }
+  .cwrap { max-width: 760px; margin: 0 auto; display: flex; gap: 11px; align-items: flex-end; }
+  #prompt {
+    flex: 1; background: rgba(12,13,20,0.72); border: 1px solid rgba(120,140,200,0.22); border-radius: 10px;
+    padding: 11px 13px; font: inherit; font-size: 14px; color: #ddd; line-height: 1.55; resize: none; outline: none;
+    min-height: 46px; max-height: 200px; transition: border-color 0.15s;
+  }
+  #prompt:focus { border-color: rgba(140,155,210,0.6); }
+  #prompt:focus-visible { outline: 2px solid #8b7ff0; outline-offset: 2px; }
+  #send {
+    border: none; border-radius: 10px; padding: 0 22px; height: 46px;
+    background: linear-gradient(90deg, #4fd1c5, #8b7ff0, #e0679e);
+    color: #050508; font-weight: 600; font-size: 13.5px; cursor: pointer; flex: 0 0 auto;
+    transition: filter 0.15s;
+  }
+  #send:hover { filter: brightness(1.08); }
+  #send:disabled { opacity: 0.5; cursor: not-allowed; }
+  #send.stop { background: none; border: 1px solid #e0679e; color: #e0679e; }
+  #send:focus-visible { outline: 2px solid #8b7ff0; outline-offset: 2px; }
+  .foot { max-width: 760px; margin: 8px auto 0; font-size: 11px; color: #5c6470; display: flex; justify-content: space-between; gap: 12px; }
+
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+  @media (max-width: 700px) {
+    header .kicker span { display: none; }
+    main.stream { padding: 14px 12px; }
+    footer.composer { padding: 10px 12px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img class="logo" src="/login-assets/logo.png" alt="Cliff View Capital">
+  <span class="kicker">AI Strategy Lab</span>
+  <nav class="mode-tabs" id="modeTabs">
+    <button type="button" class="mode-tab active" data-mode="strategy">Strategy Lab</button>
+    <button type="button" class="mode-tab" data-mode="raw">Raw Data Research</button>
+    <button type="button" class="mode-tab" data-mode="general">General Assistant</button>
+  </nav>
+  <nav>
+    <button type="button" class="btn btn-ghost" id="stateBtn" hidden>Research State</button>
+    <a class="btn btn-ghost" href="/">&larr; Chart</a>
+    <form method="POST" action="/logout" style="margin:0;">
+      <button type="submit" class="btn btn-ghost">Logout</button>
+    </form>
+  </nav>
+</header>
+
+<div class="subtitle" id="subtitle">Shadow &amp; Research -- Historical Simulation Only</div>
+
+<div class="state-panel" id="statePanel" hidden>
+  <div class="state-panel-head">
+    <strong>Shared research state</strong>
+    <button type="button" id="stateRefresh">Refresh</button>
+    <button type="button" id="stateClose">Close</button>
+  </div>
+  <div class="state-panel-body" id="statePanelBody">Loading&hellip;</div>
+</div>
+
+<main class="stream" id="stream">
+  <div class="inner" id="inner">
+    <div class="empty" id="empty">
+      <h1>Describe a strategy. See how it would have done.</h1>
+      <p>Test order-flow strategies against ~3 months of real NQ futures bar data. Every result is
+        a real, computed historical simulation -- not a guess, and not investment advice.</p>
+      <div class="examples">
+        <button type="button" data-ex="Go long when mlofi_norm is above 0.4, exit after 15 bars.">Go long when mlofi_norm &gt; 0.4, exit after 15 bars</button>
+        <button type="button" data-ex="Test a short strategy: sweep_imbalance_norm below -0.3 and vpin above 0.5, with a 10 point stop and 20 point target.">Short on sweep imbalance + high VPIN, 10/20 stop/target</button>
+        <button type="button" data-ex="What columns can I use to build a strategy?">What data is available to build strategies with?</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="composer">
+  <div class="cwrap">
+    <textarea id="prompt" rows="1" placeholder="Describe a strategy to test, or ask a question&hellip;"></textarea>
+    <button id="send">Send</button>
+  </div>
+  <div class="foot">
+    <span>Enter to send &middot; Shift+Enter for a new line</span>
+    <span id="statusNote">Ready</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+"use strict";
+
+var $ = function (id) { return document.getElementById(id); };
+var stream = $("stream"), inner = $("inner"), empty = $("empty");
+var promptEl = $("prompt"), sendBtn = $("send"), statusNote = $("statusNote");
+
+// MISSION raw-data-research Phase 2: two modes share this one page/script -- Strategy Lab (the
+// original) and Raw Data Research (a second system prompt/tool set, routed to a different
+// endpoint). Each keeps its own conversation history so switching tabs and back doesn't lose
+// context, even though only one is visibly rendered in the stream at a time.
+var mode = "strategy";
+var histories = { strategy: [], raw: [], general: [] };   // {role, content}, one array per mode
+var busy = false;
+var controller = null;
+
+var modeTabs = $("modeTabs"), stateBtn = $("stateBtn"), subtitleEl = $("subtitle");
+var statePanel = $("statePanel"), statePanelBody = $("statePanelBody");
+
+var MODE_ENDPOINT = { strategy: "/api/chat", raw: "/api/raw-research/chat", general: "/api/general-chat" };
+var MODE_LABEL = { strategy: "AI Strategy Lab", raw: "Raw Data Research", general: "General Assistant" };
+var MODE_SUBTITLE = {
+  strategy: "Shadow &amp; Research -- Historical Simulation Only",
+  raw: "Raw Market Data -- No Precomputed Features -- Historical Research Only",
+  general: "Unrestricted Web Search &amp; Local File Access -- Not Trading-Scoped",
+};
+
+function switchMode(next) {
+  if (next === mode || busy) return;
+  mode = next;
+  modeTabs.querySelectorAll(".mode-tab").forEach(function (b) {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  });
+  subtitleEl.innerHTML = MODE_SUBTITLE[mode];
+  stateBtn.hidden = mode !== "raw";
+  statePanel.hidden = true;
+  inner.innerHTML = "";
+  empty.hidden = histories[mode].length > 0;
+  if (histories[mode].length === 0) {
+    inner.appendChild(empty);
+  } else {
+    // Re-render this mode's own prior turns from its stored history (plain text only -- tool
+    // result cards/logs from earlier turns aren't reconstructed, only the conversation text).
+    histories[mode].forEach(function (m) {
+      var el = addMsg(m.role === "user" ? "user" : "bot", m.role === "user" ? "You" : MODE_LABEL[mode]);
+      el.querySelector(".body").innerHTML = renderMarkdownLite(m.content);
+    });
+    scrollDown();
+  }
+}
+modeTabs.addEventListener("click", function (e) {
+  var btn = e.target.closest(".mode-tab");
+  if (btn) switchMode(btn.dataset.mode);
+});
+
+function renderStateEntry(rec, kind) {
+  var cls = "rec" + (rec.status === "rejected" ? " rejected" : "");
+  var head = kind === "derivation" ? ("#" + rec.id + " -- " + esc(rec.claim || "")) :
+                                       ("#" + rec.id + " (" + (rec.finding_type || "") + ") -- " + esc(rec.description || "").slice(0, 140));
+  var body = "<div class=\"rec " + cls + "\"><strong>" + head + "</strong>";
+  if (rec.status === "rejected" && rec.critic_verdict) {
+    body += "<div>Rejected by " + esc(rec.critic_verdict.rejected_by || "") + ": " + esc(rec.critic_verdict.reason || "") + "</div>";
+  }
+  body += "</div>";
+  return body;
+}
+
+function loadStatePanel() {
+  statePanelBody.textContent = "Loading…";
+  fetch("/api/raw-research/state").then(function (r) { return r.json(); }).then(function (d) {
+    var html = "<h4>Journal (tail)</h4><pre>" + esc(d.journal_tail || "(empty)") + "</pre>";
+    html += "<h4>Derivations (" + (d.derivations || []).length + ")</h4>";
+    html += (d.derivations || []).map(function (r) { return renderStateEntry(r, "derivation"); }).join("") || "<em>none yet</em>";
+    html += "<h4>Findings (" + (d.findings || []).length + ")</h4>";
+    html += (d.findings || []).map(function (r) { return renderStateEntry(r, "finding"); }).join("") || "<em>none yet</em>";
+    statePanelBody.innerHTML = html;
+  }).catch(function (e) { statePanelBody.textContent = "Failed to load: " + e.message; });
+}
+stateBtn.addEventListener("click", function () {
+  statePanel.hidden = !statePanel.hidden;
+  if (!statePanel.hidden) loadStatePanel();
+});
+$("stateRefresh").addEventListener("click", loadStatePanel);
+$("stateClose").addEventListener("click", function () { statePanel.hidden = true; });
+
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderMarkdownLite(text) {
+  var blocks = [], i = 0;
+  var out = text.replace(/```(\w*)\n?([\s\S]*?)```/g, function (m, lang, code) {
+    blocks.push(code.replace(/\n$/, "")); return " B" + (i++) + " ";
+  });
+  out = esc(out);
+  out = out.replace(/`([^`\n]+)`/g, function (m, c) { return "<code>" + c + "</code>"; });
+  out = out.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  out = out.replace(/^#{1,3}\s+(.+)$/gm, "<h3>$1</h3>");
+  out = out.replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>");
+  out = out.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, "<ul>$1</ul>");
+  out = out.replace(/ B(\d+) /g, function (m, n) {
+    return '<div class="block"><button class="copy" type="button">Copy</button><pre><code>' +
+      esc(blocks[+n]) + '</code></pre></div>';
+  });
+  return out;
+}
+
+function scrollDown() { stream.scrollTop = stream.scrollHeight; }
+
+function addMsg(kind, label) {
+  if (empty && empty.parentNode) empty.remove();
+  var d = document.createElement("div");
+  d.className = "msg " + kind;
+  d.innerHTML = '<div class="who">' + esc(label) + '</div><div class="thinking" hidden></div><div class="body"></div>';
+  inner.appendChild(d); scrollDown();
+  return d;
+}
+
+inner.addEventListener("click", function (e) {
+  if (!e.target.classList.contains("copy")) return;
+  var code = e.target.parentNode.querySelector("code");
+  navigator.clipboard.writeText(code.textContent).then(function () {
+    e.target.textContent = "Copied"; setTimeout(function () { e.target.textContent = "Copy"; }, 1400);
+  });
+});
+
+empty.addEventListener("click", function (e) {
+  var ex = e.target.closest("button[data-ex]");
+  if (!ex) return;
+  promptEl.value = ex.getAttribute("data-ex");
+  send();
+});
+
+/* ------------------------------------------------------------ result card --- */
+function pctClass(v) { return v > 0 ? "pos" : (v < 0 ? "neg" : ""); }
+
+function sparkline(points) {
+  if (!points || points.length < 2) return "";
+  var min = Math.min.apply(null, points), max = Math.max.apply(null, points);
+  var range = (max - min) || 1;
+  var w = 600, h = 56;
+  var step = w / (points.length - 1);
+  var d = points.map(function (v, idx) {
+    var x = idx * step;
+    var y = h - ((v - min) / range) * h;
+    return (idx === 0 ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  var lastUp = points[points.length - 1] >= points[0];
+  var stroke = lastUp ? "#6ee7d5" : "#e0679e";
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" role="img" aria-label="Equity curve">' +
+    '<path d="' + d + '" fill="none" stroke="' + stroke + '" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>';
+}
+
+function renderResultCard(result) {
+  var card = document.createElement("div");
+  card.className = "result-card";
+  if (!result.trade_count) {
+    card.innerHTML = '<div class="empty-note">' + esc(result.message || "No trades generated.") + '</div>';
+    return card;
+  }
+  var stats = [
+    ["Trades", result.trade_count, ""],
+    ["Win rate", (result.win_rate * 100).toFixed(1) + "%", ""],
+    ["Avg pts/trade", result.avg_pnl_points, pctClass(result.avg_pnl_points)],
+    ["Total pts", result.total_pnl_points, pctClass(result.total_pnl_points)],
+    ["Max drawdown", result.max_drawdown_points + " pts", ""],
+    ["Profit factor", result.profit_factor == null ? "—" : result.profit_factor, ""],
+  ];
+  var html = sparkline(result.equity_curve_points);
+  html += '<div class="grid">' + stats.map(function (s) {
+    return '<div class="stat"><div class="v ' + s[2] + '">' + esc(String(s[1])) + '</div><div class="k">' + esc(s[0]) + '</div></div>';
+  }).join("") + '</div>';
+  html += '<div class="disclosure">' + esc(result.disclosure || "") + '</div>';
+  card.innerHTML = html;
+  return card;
+}
+
+function describeGeneratedParams(p) {
+  return Object.keys(p).sort().map(function (k) { return k + "=" + p[k]; }).join(", ");
+}
+
+function cellsFor(stats) {
+  if (!stats || !stats.trade_count) return '<td colspan="3" style="text-align:center;color:#5c6470;">no trades</td>';
+  return (
+    '<td>' + stats.trade_count + '</td>' +
+    '<td class="' + pctClass(stats.sharpe_annualized || 0) + '">' + (stats.sharpe_annualized == null ? "—" : stats.sharpe_annualized) + '</td>' +
+    '<td>' + (stats.win_rate * 100).toFixed(1) + '%</td>'
+  );
+}
+
+// MISSION strategy-lab-codegen-primary: replaces the old JSON-grid renderSweepCard -- same table
+// shape (comparing top candidates across two windows x several metrics is still a table's job, not
+// a chart's), plus the collapsible code block from renderGeneratedCard below, since a generated
+// sweep's "params" are a signal() function's swept values, not entry_conditions.
+function renderGeneratedSweepCard(result) {
+  var card = document.createElement("div");
+  card.className = "result-card";
+  if (!result.top_results) {
+    card.innerHTML = '<div class="empty-note">' + esc(result.message || "No combinations scored.") + '</div>';
+    return card;
+  }
+  var d = result.distribution || {};
+  var html = '<div class="sweep-summary">';
+  html += '<b>' + result.combinations_tested + '</b> combinations tested';
+  if (result.combinations_scored != null) html += ' · <b>' + result.combinations_scored + '</b> scored';
+  if (d.profitable_combinations != null) {
+    html += ' · <b>' + d.profitable_combinations + '</b> profitable (' + (d.profitable_fraction * 100).toFixed(0) + '%)';
+  }
+  if (d.median_sharpe_annualized != null) {
+    html += '<br>Sharpe distribution: Q1 <b>' + d.q1_sharpe_annualized + '</b> · median <b>' +
+      d.median_sharpe_annualized + '</b> · Q3 <b>' + d.q3_sharpe_annualized + '</b>';
+  }
+  if (result.expected_max_sharpe_under_null != null) {
+    html += '<div class="null-note">Expected best Sharpe from random search alone (' + result.combinations_scored +
+      ' trials): <b>' + result.expected_max_sharpe_under_null + '</b> — compare the top result against this, not zero.</div>';
+  }
+  html += '</div>';
+
+  html += '<div class="sweep-table-wrap"><table class="sweep-table"><thead>' +
+    '<tr><th></th><th></th><th colspan="3" class="grp-in">In-Sample</th><th colspan="3" class="grp-out">Out-of-Sample</th></tr>' +
+    '<tr><th>#</th><th>Params</th><th>Trades</th><th>Sharpe</th><th>Win%</th><th>Trades</th><th>Sharpe</th><th>Win%</th></tr>' +
+    '</thead><tbody>';
+  result.top_results.forEach(function (r, i) {
+    html += '<tr><td>' + (i + 1) + '</td><td class="params">' + esc(describeGeneratedParams(r.params)) + '</td>';
+    html += cellsFor(r.in_sample);
+    html += cellsFor(r.out_of_sample);
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '<details class="gen-code"><summary>View generated code</summary><pre><code>' +
+    esc(result.code || "") + '</code></pre></details>';
+  html += '<div class="disclosure">' + esc(result.disclosure || "") + '</div>';
+  card.innerHTML = html;
+  return card;
+}
+
+function windowStats(stats) {
+  if (!stats || !stats.trade_count) {
+    return '<div class="empty-note">' + esc((stats && stats.message) || "No trades.") + '</div>';
+  }
+  var tiles = [
+    ["Trades", stats.trade_count, ""],
+    ["Win rate", (stats.win_rate * 100).toFixed(1) + "%", ""],
+    ["Sharpe", stats.sharpe_annualized == null ? "—" : stats.sharpe_annualized, pctClass(stats.sharpe_annualized || 0)],
+    ["Total pts", stats.total_pnl_points, pctClass(stats.total_pnl_points)],
+    ["Max drawdown", stats.max_drawdown_points + " pts", ""],
+    ["Profit factor", stats.profit_factor == null ? "—" : stats.profit_factor, ""],
+  ];
+  return '<div class="grid">' + tiles.map(function (t) {
+    return '<div class="stat"><div class="v ' + t[2] + '">' + esc(String(t[1])) + '</div><div class="k">' + esc(t[0]) + '</div></div>';
+  }).join("") + '</div>';
+}
+
+// MISSION strategy-lab-generated-signals Phase 3: the collapsible <details> block is the literal
+// requirement ("they must be able to read what actually ran") -- closed by default so it doesn't
+// dominate the reply, but the full, real, executed code is always one click away, never hidden
+// behind a "trust me" summary.
+function renderGeneratedCard(result) {
+  var card = document.createElement("div");
+  card.className = "result-card";
+  var html = '<div class="gen-windows">';
+  html += '<div class="gen-window in"><h4>In-Sample</h4>' + windowStats(result.in_sample) + '</div>';
+  html += '<div class="gen-window out"><h4>Out-of-Sample</h4>' + windowStats(result.out_of_sample) + '</div>';
+  html += '</div>';
+  html += '<details class="gen-code"><summary>View generated code</summary><pre><code>' +
+    esc(result.code || "") + '</code></pre></details>';
+  html += '<div class="disclosure">' + esc(result.disclosure || "") + '</div>';
+  card.innerHTML = html;
+  return card;
+}
+
+// MISSION strategy-lab-web-search Phase 4: "show sources under the response -- title and link, so
+// I can check what it read. A claim from the web without a visible source is worse than no
+// claim." Renders EVERY result web_search returned (server already capped this at 5 and trimmed
+// each field -- this just displays what's already safe to display, no further filtering here).
+function renderSearchCard(result) {
+  var card = document.createElement("div");
+  card.className = "result-card search-card";
+  if (result.error) {
+    card.innerHTML = '<div class="empty-note">' + esc(result.error) + '</div>';
+    return card;
+  }
+  var label = "Sources" + (result.query ? ' for "' + esc(result.query) + '"' : "");
+  if (!result.results || !result.results.length) {
+    card.innerHTML = '<div class="search-label">' + label + '</div>' +
+      '<div class="empty-note">No results found.</div>';
+    return card;
+  }
+  var html = '<div class="search-label">' + label + '</div><ul class="sources-list">';
+  result.results.forEach(function (r) {
+    // Defense in depth: the server already only forwards http(s) urls (see web_search.py), but
+    // this is untrusted third-party content by design (Phase 2) -- never trust a single layer.
+    // A non-http(s) url (e.g. "javascript:...") renders as inert text, never a clickable <a href>.
+    var isSafeUrl = /^https?:\/\//i.test(r.url || "");
+    var linkHtml = isSafeUrl
+      ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' + esc(r.title || r.url) + "</a>"
+      : "<span>" + esc(r.title || r.url || "") + "</span>";
+    html += "<li>" + linkHtml +
+      '<span class="source-url">' + esc(r.url || "") + "</span>" +
+      (r.snippet ? '<div class="source-snippet">' + esc(r.snippet) + "</div>" : "") +
+      "</li>";
+  });
+  html += "</ul>";
+  card.innerHTML = html;
+  return card;
+}
+
+/* ------------------------------------------------------------------ send --- */
+async function send() {
+  if (busy) { if (controller) controller.abort(); return; }
+  var text = promptEl.value.trim();
+  if (!text) return;
+
+  var curMode = mode;   // pinned for the duration of this turn even if the user switches tabs mid-stream
+  addMsg("user", "You").querySelector(".body").textContent = text;
+  histories[curMode].push({ role: "user", content: text });
+  promptEl.value = ""; promptEl.style.height = "auto";
+
+  var msgEl = addMsg("bot", MODE_LABEL[curMode]);
+  var thinkingEl = msgEl.querySelector(".thinking");
+  var bodyEl = msgEl.querySelector(".body");
+
+  busy = true; sendBtn.textContent = "Stop"; sendBtn.classList.add("stop");
+  statusNote.textContent = "Thinking…";
+  controller = new AbortController();
+
+  var acc = "", chunks = 0, t0 = performance.now(), first = null;
+
+  try {
+    var res = await fetch(MODE_ENDPOINT[curMode], {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({ messages: histories[curMode] }),
+    });
+    if (!res.ok) {
+      var errBody = await res.json().catch(function () { return {}; });
+      throw new Error(errBody.message || ("HTTP " + res.status));
+    }
+
+    var reader = res.body.getReader(), dec = new TextDecoder(), buf = "";
+    for (;;) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buf += dec.decode(chunk.value, { stream: true });
+      var lines = buf.split("\n"); buf = lines.pop();
+      for (var i = 0; i < lines.length; i++) {
+        var ln = lines[i].trim();
+        if (!ln || ln.indexOf("data:") !== 0) continue;
+        var d;
+        try { d = JSON.parse(ln.slice(5).trim()); } catch (_) { continue; }
+
+        if (d.error) {
+          throw new Error(d.message || d.error);
+        }
+        if (d.cvc_event === "backtest_result") {
+          statusNote.textContent = "Backtest complete";
+          msgEl.appendChild(renderResultCard(d.result));
+          scrollDown();
+          continue;
+        }
+        if (d.cvc_event === "generated_sweep_result") {
+          statusNote.textContent = "Sweep complete";
+          msgEl.appendChild(renderGeneratedSweepCard(d.result));
+          scrollDown();
+          continue;
+        }
+        if (d.cvc_event === "generated_result") {
+          statusNote.textContent = "Generated signal tested";
+          msgEl.appendChild(renderGeneratedCard(d.result));
+          scrollDown();
+          continue;
+        }
+        if (d.cvc_event === "web_search_result") {
+          statusNote.textContent = "Search complete";
+          msgEl.appendChild(renderSearchCard(d.result));
+          scrollDown();
+          continue;
+        }
+        // MISSION raw-data-research Phase 2: raw-research-mode events -- kept as compact log
+        // lines, not full result cards, since most of these tools return small/structured data
+        // (counts, statuses, ids) rather than something worth a dedicated visual card. The
+        // shared journal/derivations/findings are the "read along" surface (via the Research
+        // State panel), not these inline logs -- these are just enough to show it's working.
+        if (d.cvc_event === "tool_result") {
+          statusNote.textContent = d.tool + " done";
+          var line = document.createElement("div");
+          line.className = "tool-log" + (d.result && d.result.error ? "" : "");
+          var summary = d.result && d.result.error ? ("error: " + d.result.error) :
+                        (d.result && typeof d.result.count === "number") ? (d.result.count + " rows") :
+                        (d.result && d.result.status) ? d.result.status :
+                        "done";
+          line.innerHTML = "<span class=\"err\">" + esc(d.tool) + "</span> -- " + esc(String(summary));
+          if (d.result && d.result.error) line.querySelector(".err").className = "";
+          msgEl.appendChild(line);
+          scrollDown();
+          continue;
+        }
+        if (d.cvc_event === "subagent_started") {
+          statusNote.textContent = "Subagent working…";
+          var startLine = document.createElement("div");
+          startLine.className = "tool-log subagent";
+          startLine.textContent = "→ subagent delegated: " + (d.task || "").slice(0, 100);
+          msgEl.appendChild(startLine);
+          scrollDown();
+          continue;
+        }
+        if (d.cvc_event === "subagent_progress") {
+          statusNote.textContent = "Subagent round " + d.round + "…";
+          var progLine = document.createElement("div");
+          progLine.className = "tool-log subagent";
+          progLine.textContent = "  round " + d.round + ": " + ((d.tools || []).join(", ") || d.note || "");
+          msgEl.appendChild(progLine);
+          scrollDown();
+          continue;
+        }
+        if (d.cvc_event === "subagent_finished") {
+          statusNote.textContent = "Subagent done";
+          var doneLine = document.createElement("div");
+          doneLine.className = "tool-log subagent";
+          doneLine.textContent = "← subagent finished (" + (d.rounds_used || 0) + " rounds)";
+          msgEl.appendChild(doneLine);
+          scrollDown();
+          continue;
+        }
+        if (d.reasoning_content) {
+          thinkingEl.hidden = false;
+          thinkingEl.textContent = "Thinking: " + (thinkingEl.textContent.replace(/^Thinking: /, "") + d.reasoning_content).slice(-160);
+        }
+        if (d.content) {
+          if (first === null) { first = performance.now(); thinkingEl.hidden = true; }
+          acc += d.content; chunks++;
+          bodyEl.innerHTML = renderMarkdownLite(acc);
+          scrollDown();
+        }
+      }
+    }
+
+    thinkingEl.hidden = true;
+    if (!acc && !msgEl.querySelector(".result-card")) {
+      bodyEl.innerHTML = renderMarkdownLite("_No response generated. Try rephrasing._");
+    }
+    if (acc) {
+      var secs = (performance.now() - (first || t0)) / 1000;
+      var s = document.createElement("div");
+      s.className = "stats";
+      s.textContent = chunks + " chunks · " + secs.toFixed(1) + "s";
+      bodyEl.appendChild(s);
+      histories[curMode].push({ role: "assistant", content: acc });
+    }
+    statusNote.textContent = "Ready";
+
+  } catch (err) {
+    thinkingEl.hidden = true;
+    if (err.name === "AbortError") {
+      if (acc) { bodyEl.innerHTML = renderMarkdownLite(acc); histories[curMode].push({ role: "assistant", content: acc }); }
+      else if (!msgEl.querySelector(".result-card")) { bodyEl.innerHTML = renderMarkdownLite("_Stopped._"); }
+      statusNote.textContent = "Stopped";
+    } else {
+      msgEl.className = "msg err";
+      bodyEl.innerHTML = renderMarkdownLite("Something went wrong: " + err.message);
+      statusNote.textContent = "Error";
+    }
+  } finally {
+    busy = false; controller = null;
+    sendBtn.textContent = "Send"; sendBtn.classList.remove("stop");
+    promptEl.focus();
+  }
+}
+
+sendBtn.addEventListener("click", send);
+promptEl.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+promptEl.addEventListener("input", function () {
+  promptEl.style.height = "auto";
+  promptEl.style.height = Math.min(promptEl.scrollHeight, 200) + "px";
+});
+
+})();
+</script>
+</body>
+</html>

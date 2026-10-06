@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Book Flow Chart -- Web Beta (W1, SHADOW/RESEARCH ONLY)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; padding: 0; background: #050505; color: #ddd; font-family: "Segoe UI", sans-serif; height: 100%; overflow: hidden; }
+  #toolbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: #0b0b0b; border-bottom: 1px solid #222; font-size: 13px; flex-wrap: wrap; }
+  #toolbar label { color: #aaa; }
+  /* MISSION toolbar-cleanup: same logo.png asset as login.html/landing.html, scaled to the
+     toolbar's own compact row height rather than their larger header-scale sizing. */
+  #brandMark { height: 26px; display: block; }
+  #toolbar select, #toolbar input, #toolbar button {
+    background: #181818; color: #ddd; border: 1px solid #333; border-radius: 3px; padding: 3px 6px; font-size: 13px;
+  }
+  #toolbar button.active { background: #2a6; color: #041; font-weight: bold; }
+  /* MISSION ai-strategy-lab: the one nav entry point that gets the site's gradient treatment
+     (text only, not a filled button -- that stays reserved for strategy-lab.html's own Send
+     button, matching the rest of the site's "gradient = the one primary action" convention) so it
+     reads as a distinct, new capability rather than another gray utility toggle. */
+  #strategyLabLink {
+    font-size: 13px; font-weight: 600; text-decoration: none; padding: 3px 6px;
+    border: 1px solid #333; border-radius: 3px;
+    background: linear-gradient(90deg, #4fd1c5, #8b7ff0, #e0679e);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #strategyLabLink:hover { border-color: #555; }
+  body.lightTheme #strategyLabLink { border-color: #bbb; }
+  #status { margin-left: auto; color: #88ccff; }
+  #status.stale { color: #ff6666; }
+  /* W2.4 Part D: connection-lifecycle state, distinct from #status's free-text log-style message */
+  #connState { font-weight: bold; padding: 3px 8px; border-radius: 3px; letter-spacing: 0.3px; }
+  #connState.connected { background: #00d27a; color: #04140c; }
+  #connState.connecting, #connState.reconnecting { background: #ffd166; color: #332600; }
+  #connState.disconnected { background: #888; color: #111; }
+  /* MISSION tester-feedback issue 5: distinct terminal state -- reconnecting can never fix this,
+     only signing in again can, so it gets its own unmistakable red (not the neutral gray "disconnected"
+     that implies "will retry"). */
+  #connState.signedOut { background: #ff3b3b; color: #fff; }
+  /* W2.7 Part B: connection healthy but no data arriving for a while (LIVE_FEED_WARN_MS) --
+     distinct from both the green "connected" (data flowing normally) and the amber
+     "reconnecting" (pipe treated as dead, backoff reconnect already under way). */
+  #connState.stale { background: #ff9f43; color: #331a00; }
+  /* W2.9 Part 2/3: the SERVER's own /status reports its poll loop stalled (last_poll_ts too old) --
+     a distinct, more specific/confirmed signal than this client's own "stale" idle-time guess, so
+     it gets its own louder color rather than being folded into .stale. */
+  #connState.degraded { background: #ff3b3b; color: #ffffff; }
+  /* W2.8 Part A: direct readout of View.userSet (the desktop's own user_view_override) -- amber
+     "manual view" once any pan/zoom disengages follow-live, until Reset View is pressed. */
+  #followIndicator { font-weight: bold; padding: 3px 8px; border-radius: 3px; letter-spacing: 0.3px; }
+  #followIndicator.following { background: #2a6; color: #041; }
+  #followIndicator.manual { background: #ffd166; color: #332600; }
+  #modeBadge { font-weight: bold; padding: 3px 10px; border-radius: 3px; letter-spacing: 0.5px; }
+  #modeBadge.live { background: #00d27a; color: #04140c; }
+  #modeBadge.stale { background: #888; color: #111; }
+  #modeBadge.replay { background: #3388ee; color: #04101c; }
+  /* W2.5 Part B: REPLAY ENDED is a distinct, expected/benign state (the recorded session ran out
+     and will loop) -- deliberately NOT the same gray as .stale (an unexpected stall/feed problem). */
+  #modeBadge.replayEnded { background: #ffd166; color: #332600; }
+  /* MISSION zscores-book-alignment-fix: chartRow is now the OUTER flex COLUMN (candleBookRow, then
+     the z-score handle/panel below it) -- mainCanvas and bookCanvas both live inside candleBookRow,
+     the ONE row that actually shrinks when the z-score panel takes space, so they are always
+     exactly the same height as each other, in every state. Before this, mainCanvasWrap alone was
+     the flex column carrying the z-score panel, so bookCanvasWrap (a plain sibling of that whole
+     column) never shrank with it -- confirmed by direct measurement: mainCanvas/bookCanvas heights
+     went from 760/760 (aligned) to 641/760 (92px vertical misalignment) the moment the panel opened,
+     and the offset never changed with scrolling since it's a static layout mismatch, not a per-frame
+     calculation bug. */
+  #chartRow { display: flex; flex-direction: column; height: calc(100% - 40px); }
+  #candleBookRow { flex: 1 1 auto; display: flex; min-height: 0; }
+  #mainCanvasWrap { flex: 1 1 auto; position: relative; }
+  #bookCanvasWrap { width: 220px; flex: 0 0 220px; position: relative; border-left: 1px solid #222; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #banner { position: absolute; top: 4px; left: 8px; font-size: 11px; color: #666; pointer-events: none; display: none; }
+  #banner.debugVisible { display: block; }
+
+  #bookHoverTooltip {
+    position: absolute; background: #1a1a1a; color: #eee; padding: 2px 6px; border: 1px solid #555;
+    border-radius: 3px; font: 10px "Segoe UI", sans-serif; pointer-events: none; z-index: 10;
+    white-space: nowrap; display: none;
+  }
+
+  /* MISSION zscores-panel-viewport-sync: --zpanel-h is "how tall when visible" (drag-resizable, see
+     app.js); visibility is the .visible class, so flexbox genuinely removes the row (handing space
+     back to candleBookRow) instead of just collapsing it to 0 height.
+     MISSION zscores-book-alignment-fix: margin-right:220px (matching bookCanvasWrap's own fixed
+     width) keeps the panel's right edge stopping before the order book column now that it's a
+     sibling of candleBookRow rather than nested inside just mainCanvasWrap. */
+  #zscoreResizeHandle { flex: 0 0 6px; cursor: ns-resize; background: #161616; display: none; margin-right: 220px; }
+  #zscoreResizeHandle:hover, #zscoreResizeHandle.dragging { background: #2a6; }
+  #zscoreResizeHandle.visible { display: block; }
+  #zscorePanel { flex: 0 0 var(--zpanel-h, 112px); overflow: hidden; border-top: 1px solid #222; background: #050505; display: none; margin-right: 220px; }
+  #zscorePanel.visible { display: block; }
+
+  /* MISSION drawing-tools */
+  #drawingModeIndicator { font-weight: bold; padding: 3px 8px; border-radius: 3px; letter-spacing: 0.3px; background: #ffd166; color: #332600; display: none; }
+  #drawingModeIndicator.visible { display: inline; }
+  #drawingContextMenu {
+    position: fixed; display: none; z-index: 50; background: #151515; border: 1px solid #333;
+    border-radius: 4px; padding: 4px 0; min-width: 190px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    font-size: 13px; font-family: "Segoe UI", sans-serif;
+  }
+  #drawingContextMenu.visible { display: block; }
+  #drawingContextMenu .item { padding: 7px 14px; color: #ddd; cursor: pointer; white-space: nowrap; }
+  #drawingContextMenu .item:hover { background: #2a6; color: #041; }
+  #drawingContextMenu .item.danger:hover { background: #b33; color: #fff; }
+  #drawingContextMenu .sep { height: 1px; background: #333; margin: 4px 0; }
+
+  /* MISSION toolbar-light-theme: toggled via body.lightTheme (see setLightTheme() in app.js).
+     Persists the same way Depth does -- a URL query param (?theme=light), not localStorage; this
+     codebase has no localStorage mechanism anywhere else, so Depth's existing pattern is the one
+     being matched, not a new one being introduced. Palette below was confirmed via direct WCAG
+     contrast measurement and real before/after screenshots before this was built (see the MISSION
+     toolbar-light-theme proposal) -- canvas-drawn colors (candles, order book, z-score panel,
+     drawings, crosshair) are handled separately in app.js via the same tc()/LIGHT_COLOR_MAP this
+     CSS block's colors were chosen alongside. Self-contained colored badges (#connState,
+     #followIndicator, #modeBadge, #drawingModeIndicator, drawing-menu hover states) are
+     deliberately NOT overridden here -- they already carry their own explicit background+text
+     pair, unrelated to the page background, so they read correctly in either theme unchanged. */
+  body.lightTheme { background: #ffffff; color: #222; color-scheme: light; }
+  body.lightTheme #toolbar { background: #f0f0f0; border-bottom-color: #ccc; color: #222; }
+  body.lightTheme #toolbar select, body.lightTheme #toolbar input, body.lightTheme #toolbar button {
+    background: #ffffff; color: #222; border-color: #bbb;
+  }
+  body.lightTheme #status { color: #1a6fb0; }
+  body.lightTheme #status.stale { color: #cc3333; }
+  body.lightTheme #signInAgainLink { color: #7a5000; }
+  body.lightTheme #bookCanvasWrap { border-left-color: #ccc; }
+  body.lightTheme #zscorePanel { background: #ffffff; border-top-color: #ccc; }
+  body.lightTheme #zscoreResizeHandle { background: #e8e8e8; border-top-color: #ccc; }
+  body.lightTheme #zscoreResizeHandle:hover, body.lightTheme #zscoreResizeHandle.dragging { background: #2a6; }
+  body.lightTheme #drawingContextMenu { background: #ffffff; border-color: #ccc; box-shadow: 0 4px 16px rgba(0,0,0,0.18); }
+  body.lightTheme #drawingContextMenu .item { color: #222; }
+  body.lightTheme #drawingContextMenu .sep { background: #ddd; }
+  body.lightTheme #banner { color: #888; }
+</style>
+</head>
+<body>
+  <div id="toolbar">
+    <img id="brandMark" src="/login-assets/logo.png" alt="Cliff View Capital">
+    <!-- MISSION toolbar-cleanup: session dropdown kept in the DOM, hidden -- not shown in the
+         toolbar, but tests/test_connection_lifecycle.py still drives it directly to exercise
+         session-switching, and connectBtn/its own change handler still read it internally. -->
+    <select id="sessionSelect" style="display:none"><option>(connect to load)</option></select>
+    <button id="connectBtn">Connect</button>
+    <span>speed:</span>
+    <button id="speed1x" class="speedBtn">1x</button>
+    <button id="speed8x" class="speedBtn">8x</button>
+    <button id="speedPause" class="speedBtn">Pause</button>
+    <button id="resetViewBtn">Reset View</button>
+    <label>lookback:
+      <select id="lookbackSelect">
+        <option value="1">1 session</option>
+        <option value="2" selected>2 sessions</option>
+        <option value="3">3 sessions</option>
+        <option value="4">4 sessions</option>
+        <option value="5">5 sessions</option>
+      </select>
+    </label>
+    <label>z-scores:
+      <select id="zscoreSelect">
+        <option value="off" selected>Off</option>
+        <option value="regime">Regime</option>
+        <option value="delta">Delta</option>
+        <option value="volatility">Volatility</option>
+        <option value="sweep_imb">Sweep Imbalance</option>
+        <option value="vpin">VPIN</option>
+      </select>
+    </label>
+    <span id="drawingModeIndicator"></span>
+    <span id="followIndicator" class="following">following live</span>
+    <button id="depthToggleBtn" class="active">Depth</button>
+    <!-- MISSION toolbar-light-theme: same toggle-button convention as Depth (plain button, .active
+         when on); init/listener wired in app.js alongside depthToggleBtn's own. -->
+    <button id="themeToggleBtn">Light</button>
+    <span id="modeBadge" class="replay">--</span>
+    <span id="connState" class="disconnected">disconnected</span>
+    <span id="status">disconnected</span>
+    <!-- MISSION tester-feedback issue 5: shown only by handleSessionRevoked() on a real 4001/401 --
+         a session revoked elsewhere (new login under the same credential, admin force-logout) can't
+         be fixed by reconnecting, only by signing in again. -->
+    <a id="signInAgainLink" href="/login" style="display:none; color:#ffd166; font-weight:bold; text-decoration:underline;">Sign in again</a>
+    <a id="strategyLabLink" href="/strategy-lab" style="margin-left:auto;">AI Strategy Lab</a>
+    <form id="logoutForm" method="POST" action="/logout">
+      <button id="logoutBtn" type="submit">Logout</button>
+    </form>
+  </div>
+  <div id="chartRow">
+    <div id="candleBookRow">
+      <div id="mainCanvasWrap">
+        <canvas id="mainCanvas"></canvas>
+        <div id="banner"></div>
+      </div>
+      <div id="bookCanvasWrap">
+        <canvas id="bookCanvas"></canvas>
+        <div id="bookHoverTooltip"></div>
+      </div>
+    </div>
+    <div id="zscoreResizeHandle" title="drag to resize"></div>
+    <div id="zscorePanel">
+      <canvas id="zscoreCanvas"></canvas>
+    </div>
+  </div>
+  <!-- MISSION drawing-tools-delete: contents are built dynamically by showDrawingMenu() in
+       app.js -- add-new-drawing items for empty space, delete-this-one + erase-all for a hit
+       drawing -- so this starts empty rather than carrying stale static markup. -->
+  <div id="drawingContextMenu"></div>
+  <script src="app.js"></script>
+</body>
+</html>
